@@ -33,7 +33,7 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 # Configure CS50 Library to use SQLite database
-db = SQL("sqlite:///finance.db")
+db = SQL("sqlite:///finance/finance.db")
 
 # Make sure API key is set
 if not os.environ.get("API_KEY"):
@@ -119,7 +119,27 @@ def quote():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     """Register user"""
-    return apology("TODO")
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        confirmation = request.form.get("confirmation")
+
+        # Check if the entered username already exists in the database
+        # Query database for username
+        rows = db.execute("SELECT * FROM users WHERE username = :username", username=username)
+        if len(rows) != 0:
+            return apology("this username already exists", 403)
+            # Check if password and password confirmation match
+        elif password != confirmation:
+            return apology("the password and confirmation don't match") # Bad request error
+
+        # INSERT the new user into users, storing a hash of the user’s password
+        hash_value = generate_password_hash(password, method='sha256')
+        db.execute("INSERT INTO users (username, hash) VALUES (:username, :hash)", username=username, hash=hash_value)
+        # Redirect user to home page
+        return redirect("/")
+    else:
+        return render_template("register.html")
 
 
 @app.route("/sell", methods=["GET", "POST"])
