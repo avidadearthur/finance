@@ -138,10 +138,7 @@ def quote():
 def register():
     """Register user"""
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        confirmation = request.form.get("confirmation")
-
+        username, password, confirmation  = request.form.get("username"), request.form.get("password"), request.form.get("confirmation")
         # Check if the entered username already exists in the database
         # Query database for username
         rows = db.execute("SELECT * FROM users WHERE username = :username", username=username)
