@@ -53,16 +53,27 @@ def buy():
     """Buy shares of stock"""
     if request.method == "POST":
         symbol, shares = request.form.get("symbol"), int(request.form.get("shares"))
+
         # Get stock info through look up function
         symbol_data = lookup(symbol)
         unit_price, name = symbol_data['price'], symbol_data['name']
+
         # Query database for user cash
         row = db.execute("SELECT * FROM users WHERE id = :id", id=session["user_id"])
+
         # Compare inputed shares value with user's current cash
-        if row[0]['cash'] >= (shares * unit_price):
-            # Check if the user already owns shares of this symbol
-            # Create table that incorporates a key from users (row[0]['id']) and data about the transaction
+        cash, transaction_sum = row[0]['cash'], (shares * unit_price)
+        if cash >= transaction_sum:
+            # Insert new buy transaction in table
+            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol, sold) 
+                        VALUES ((SELECT id FROM users WHERE id = :id), :amount, :price, :symbol)""", id=session["user_id"], amount=shares, price=unit_price, symbol=symbol)
+
+            cash -= transaction_sum
+            # Subtract transaction value from user funds
+            db.execute("UPDATE users SET cash = :cash WHERE id = :id", cash=cash, id=session["user_id"])
+            
             return render_template("buy.html", status="success", message=f"Transaction succeded, you bought {shares} shares of {name}")
+
         else:
             return render_template("buy.html", status="danger", message=f"Transaction failed, insuficient funds for buying {shares} shares of {name}")
     else:
