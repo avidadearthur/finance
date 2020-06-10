@@ -51,7 +51,15 @@ def index():
 @login_required
 def buy():
     """Buy shares of stock"""
-    return apology("TODO")
+    if request.method == "POST":
+        symbol, shares = request.form.get("symbol"), request.form.get("shares")
+        # Get stock info through look up function
+        symbol_data = lookup(symbol)
+        unit_price = symbol_data['price']
+
+        return apology("TODO")
+    else:
+        return render_template("buy.html")
 
 
 @app.route("/history")
@@ -120,9 +128,7 @@ def quote():
         if symbol_data == None:
             return render_template("quote.html", quote=f"Oops... symbol not found")
         else:
-            name = symbol_data['name']
-            price = usd(symbol_data['price'])
-
+            name, price = symbol_data['name'], usd(symbol_data['price'])
             return render_template("quote.html", quote=f"Current share price of {name}: {price}")
     else:
         return render_template("quote.html")
