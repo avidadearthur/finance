@@ -44,7 +44,7 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return apology("TODO")
+    return render_template("index.html")
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -65,7 +65,7 @@ def buy():
         cash, transaction_sum = row[0]['cash'], (shares * unit_price)
         if cash >= transaction_sum:
             # Insert new buy transaction in table
-            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol, sold) 
+            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol) 
                         VALUES ((SELECT id FROM users WHERE id = :id), :amount, :price, :symbol)""", id=session["user_id"], amount=shares, price=unit_price, symbol=symbol)
 
             cash -= transaction_sum
