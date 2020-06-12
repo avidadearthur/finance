@@ -17,15 +17,26 @@
       </tr>
     </thead>
     <tbody>
-        {% for row in rows %}
-        <tr>
-            <td>{{ row['symbol'] }}</td>
-            <td>{{ row['name'] }}</td>
-            <td>{{ row['shares'] }}</td>
-            <td>{{ row['price'] }}</td>
-            <td>{{ row['total'] }}</td>
-        </tr>
-        {% endfor %}
+      {% for symbol_data in stocks_data %}
+      <tr>
+        <td>{{ symbol_data['symbol'] }}</td>
+        <td>{{ symbol_data['name'] }}</td>
+        <td>{{ symbol_data['shares'] }}</td>
+        <td>{{ symbol_data['price'] }}</td>
+        <td>{{ symbol_data['total'] }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td>CASH</td>
+        <td colspan="3"></td>
+        <td>{{ cash }}</td>
+      </tr>
     </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4"></td>
+        <td>{{ sum }}</td>
+      </tr>
+    </tfoot>
 </table>
 {% endblock %}
