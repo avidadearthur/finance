@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Quote
+{% endblock %}
+
+{% block main %}
+
+<table class="table table-striped">
+    <thead>
+      <tr>
+        <th scope="col">Symbol</th>
+        <th scope="col">Name</th>
+        <th scope="col">Shares</th>
+        <th scope="col">Price</th>
+        <th scope="col">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for symbol_data in stocks_data %}
+      <tr>
+        <td>{{ symbol_data['symbol'] }}</td>
+        <td>{{ symbol_data['name'] }}</td>
+        <td>{{ symbol_data['shares'] }}</td>
+        <td>{{ symbol_data['price'] }}</td>
+        <td>{{ symbol_data['total'] }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td>CASH</td>
+        <td colspan="3"></td>
+        <td>{{ cash }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4"></td>
+        <td>{{ sum }}</td>
+      </tr>
+    </tfoot>
+</table>
+{% endblock %}

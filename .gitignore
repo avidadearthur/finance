@@ -141,5 +141,5 @@ cython_debug/
 # Database file
 finance.db
 
-# OS generated files
+#  OS generated files
 finance/templates/.DS_Store

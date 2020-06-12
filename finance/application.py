@@ -44,7 +44,26 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return render_template("index.html")
+    # Query the transactions table for current portifolio
+    owned_stocks = db.execute("SELECT symbol, shares FROM portfolios WHERE user_id = :id", id=session["user_id"])
+    stocks_data = []
+    funds = 0  
+    for stocks in owned_stocks:
+        symbol_data = lookup(stocks['symbol'])
+        # Add user owned shares to lookup data dictionary
+        symbol_data['shares'] = stocks['shares']
+        # Add total value of symbol's owned shares
+        symbol_data['total'] = symbol_data['shares'] * symbol_data['price']
+        funds += symbol_data['total']
+
+        symbol_data['total'], symbol_data['price'] = usd(symbol_data['shares'] * symbol_data['price']), usd(symbol_data['price'])
+        stocks_data.append(symbol_data)
+    
+    cash = (db.execute("SELECT * FROM users WHERE id = :id", id=session["user_id"]))[0]['cash']
+    funds += cash
+    cash, funds = usd(cash), usd(funds)
+    
+    return render_template("index.html", stocks_data=stocks_data, cash=cash, sum=funds)
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -65,10 +84,25 @@ def buy():
         cash, transaction_sum = row[0]['cash'], (shares * unit_price)
         if cash >= transaction_sum:
             # Insert new buy transaction in table
-            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol) 
-                        VALUES ((SELECT id FROM users WHERE id = :id), :amount, :price, :symbol)""", id=session["user_id"], amount=shares, price=unit_price, symbol=symbol)
+            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol)
+                        VALUES (:id, :amount, :price, :symbol)""", id=session["user_id"], amount=shares, price=unit_price, symbol=symbol)
+            transaction_id = db.execute("SELECT last_insert_rowid()")[0]['last_insert_rowid()']
 
             cash -= transaction_sum
+            
+            # Update the portfolios table
+            # Check if user already owns any share of the symbol bought
+            rows = db.execute("""SELECT 1 FROM portfolios WHERE symbol = :symbol AND user_id = :id""", id=session["user_id"], symbol=symbol)
+            if len(rows) != 1:
+                # It's the first time this user operates this symbol
+                db.execute("""INSERT INTO portfolios (last_trans_id, user_id, symbol, shares) 
+                            VALUES (:transaction_id, :id, :symbol, :shares)""", transaction_id=transaction_id, id=session["user_id"], symbol=symbol, shares=shares)
+            else:
+                # It's not this user's first time buying this symbol, just update the row that refers
+                # to his shares of this stock
+                db.execute("""UPDATE portfolios SET shares = shares + :shares 
+                            WHERE symbol = :symbol AND user_id = :id """, id=session["user_id"], symbol=symbol, shares=shares) 
+
             # Subtract transaction value from user funds
             db.execute("UPDATE users SET cash = :cash WHERE id = :id", cash=cash, id=session["user_id"])
             
