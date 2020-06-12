@@ -45,8 +45,25 @@ if not os.environ.get("API_KEY"):
 def index():
     """Show portfolio of stocks"""
     # Query the transactions table for current portifolio
+    owned_stocks = db.execute("SELECT symbol, shares FROM portfolios WHERE user_id = :id", id=session["user_id"])
+    stocks_data = []
+    funds = 0  
+    for stocks in owned_stocks:
+        symbol_data = lookup(stocks['symbol'])
+        # Add user owned shares to lookup data dictionary
+        symbol_data['shares'] = stocks['shares']
+        # Add total value of symbol's owned shares
+        symbol_data['total'] = symbol_data['shares'] * symbol_data['price']
+        funds += symbol_data['total']
+
+        symbol_data['total'], symbol_data['price'] = usd(symbol_data['shares'] * symbol_data['price']), usd(symbol_data['price'])
+        stocks_data.append(symbol_data)
     
-    return render_template("index.html")
+    cash = (db.execute("SELECT * FROM users WHERE id = :id", id=session["user_id"]))[0]['cash']
+    funds += cash
+    cash, funds = usd(cash), usd(funds)
+    
+    return render_template("index.html", stocks_data=stocks_data, cash=cash, sum=funds)
 
 
 @app.route("/buy", methods=["GET", "POST"])
