@@ -118,7 +118,15 @@ def buy():
 @login_required
 def history():
     """Show history of transactions"""
-    return apology("TODO")
+    # Query the transactions table for current portifolio
+    transactions = db.execute("SELECT * FROM transactions WHERE user_id = :id", id=session["user_id"])
+    transactions_data = []
+    # Formating database info
+    for transaction in transactions:
+        transaction['symbol'], transaction['price'] = (transaction['symbol']).upper(), usd(transaction['price'])
+        transactions_data.append(transaction)
+        
+    return render_template("history.html", transactions=transactions_data)
 
 
 @app.route("/login", methods=["GET", "POST"])
