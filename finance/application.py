@@ -100,8 +100,8 @@ def buy():
             else:
                 # It's not this user's first time buying this symbol, just update the row that refers
                 # to his shares of this stock
-                db.execute("""UPDATE portfolios SET shares = shares + :shares 
-                            WHERE symbol = :symbol AND user_id = :id """, id=session["user_id"], symbol=symbol, shares=shares) 
+                db.execute("""UPDATE portfolios SET shares = shares + :shares, last_trans_id = :transaction_id 
+                            WHERE symbol = :symbol AND user_id = :id """, id=session["user_id"], symbol=symbol, shares=shares, transaction_id=transaction_id) 
 
             # Subtract transaction value from user funds
             db.execute("UPDATE users SET cash = :cash WHERE id = :id", cash=cash, id=session["user_id"])
