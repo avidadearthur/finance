@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Buy
+{% endblock %}
+
+{% block main %}
+<div class="alert alert-{{ status }}" role="alert">{{ message }}</div>
+<form class="align-self-center" action="/sell" method="post">
+    <div class="input-group">
+        <div class="input-group-prepend">
+            <button class="btn btn-primary" type="submit">sell</button>
+        </div>
+        <select name="symbol" class="custom-select" id="inputGroupSelect04" placeholder="Shares">
+            {% for symbol in symbols %}
+                <option value="{{ symbol['symbol'] }}" >{{ symbol['symbol'] }}</option>
+            {% endfor %}
+        </select>
+        <input autocomplete="off" class="form-control" min="1" name="shares" placeholder="Shares" type="number" required>
+    </div>
+</form>
+{% endblock %}
