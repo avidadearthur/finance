@@ -44,21 +44,89 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return apology("TODO")
+    # Query the transactions table for current portifolio
+    owned_stocks = db.execute("SELECT symbol, shares FROM portfolios WHERE user_id = :id", id=session["user_id"])
+    stocks_data = []
+    funds = 0  
+    for stocks in owned_stocks:
+        symbol_data = lookup(stocks['symbol'])
+        # Add user owned shares to lookup data dictionary
+        symbol_data['shares'] = stocks['shares']
+        # Add total value of symbol's owned shares
+        symbol_data['total'] = symbol_data['shares'] * symbol_data['price']
+        funds += symbol_data['total']
+
+        symbol_data['total'], symbol_data['price'] = usd(symbol_data['shares'] * symbol_data['price']), usd(symbol_data['price'])
+        stocks_data.append(symbol_data)
+    
+    cash = (db.execute("SELECT * FROM users WHERE id = :id", id=session["user_id"]))[0]['cash']
+    funds += cash
+    cash, funds = usd(cash), usd(funds)
+    
+    return render_template("index.html", stocks_data=stocks_data, cash=cash, sum=funds)
 
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
     """Buy shares of stock"""
-    return apology("TODO")
+    if request.method == "POST":
+        symbol, shares = request.form.get("symbol"), int(request.form.get("shares"))
+
+        # Get stock info through look up function
+        symbol_data = lookup(symbol)
+        unit_price, name = symbol_data['price'], symbol_data['name']
+
+        # Query database for user cash
+        row = db.execute("SELECT * FROM users WHERE id = :id", id=session["user_id"])
+
+        # Compare inputed shares value with user's current cash
+        cash, transaction_sum = row[0]['cash'], (shares * unit_price)
+        if cash >= transaction_sum:
+            # Insert new buy transaction in table
+            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol)
+                        VALUES (:id, :amount, :price, :symbol)""", id=session["user_id"], amount=shares, price=unit_price, symbol=symbol)
+            transaction_id = db.execute("SELECT last_insert_rowid()")[0]['last_insert_rowid()']
+
+            cash -= transaction_sum
+            
+            # Update the portfolios table
+            # Check if user already owns any share of the symbol bought
+            rows = db.execute("""SELECT 1 FROM portfolios WHERE symbol = :symbol AND user_id = :id""", id=session["user_id"], symbol=symbol)
+            if len(rows) != 1:
+                # It's the first time this user operates this symbol
+                db.execute("""INSERT INTO portfolios (last_trans_id, user_id, symbol, shares) 
+                            VALUES (:transaction_id, :id, :symbol, :shares)""", transaction_id=transaction_id, id=session["user_id"], symbol=symbol, shares=shares)
+            else:
+                # It's not this user's first time buying this symbol, just update the row that refers
+                # to his shares of this stock
+                db.execute("""UPDATE portfolios SET shares = shares + :shares, last_trans_id = :transaction_id 
+                            WHERE symbol = :symbol AND user_id = :id """, id=session["user_id"], symbol=symbol, shares=shares, transaction_id=transaction_id) 
+
+            # Subtract transaction value from user funds
+            db.execute("UPDATE users SET cash = :cash WHERE id = :id", cash=cash, id=session["user_id"])
+            
+            return render_template("buy.html", status="success", message=f"Transaction succeded, you bought {shares} shares of {name}")
+
+        else:
+            return render_template("buy.html", status="danger", message=f"Transaction failed, insuficient funds for buying {shares} shares of {name}")
+    else:
+        return render_template("buy.html")
 
 
 @app.route("/history")
 @login_required
 def history():
     """Show history of transactions"""
-    return apology("TODO")
+    # Query the transactions table for current portifolio
+    transactions = db.execute("SELECT * FROM transactions WHERE user_id = :id", id=session["user_id"])
+    transactions_data = []
+    # Formating database info
+    for transaction in transactions:
+        transaction['symbol'], transaction['price'] = (transaction['symbol']).upper(), usd(transaction['price'])
+        transactions_data.append(transaction)
+        
+    return render_template("history.html", transactions=transactions_data)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -120,9 +188,7 @@ def quote():
         if symbol_data == None:
             return render_template("quote.html", quote=f"Oops... symbol not found")
         else:
-            name = symbol_data['name']
-            price = usd(symbol_data['price'])
-
+            name, price = symbol_data['name'], usd(symbol_data['price'])
             return render_template("quote.html", quote=f"Current share price of {name}: {price}")
     else:
         return render_template("quote.html")
@@ -132,10 +198,7 @@ def quote():
 def register():
     """Register user"""
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        confirmation = request.form.get("confirmation")
-
+        username, password, confirmation  = request.form.get("username"), request.form.get("password"), request.form.get("confirmation")
         # Check if the entered username already exists in the database
         # Query database for username
         rows = db.execute("SELECT * FROM users WHERE username = :username", username=username)
@@ -157,8 +220,53 @@ def register():
 @app.route("/sell", methods=["GET", "POST"])
 @login_required
 def sell():
+    # Query portifolio table to get user stocks
+    owned_stocks = db.execute("SELECT symbol FROM portfolios WHERE user_id = :id", id=session["user_id"])
+    # Abusing of Generator Expressions
+    # to set all the stock symbols from owned_stocks list of dicts to uppercase
+    owned_stocks = list(dict((k, v.upper()) for k,v in stock.items()) for stock in owned_stocks) 
+
     """Sell shares of stock"""
-    return apology("TODO")
+    if request.method == "POST":
+        symbol, shares = str.lower(request.form.get("symbol")), int(request.form.get("shares"))
+        
+        owned_shares = db.execute("SELECT shares FROM portfolios WHERE user_id = :id AND symbol = :symbol", id=session["user_id"], symbol=symbol)
+
+        # Get stock info through look up function
+        symbol_data = lookup(symbol)
+        unit_price, name = symbol_data['price'], symbol_data['name']
+
+        if shares <= owned_shares[0]['shares']:
+
+            # Query database for user cash
+            row = db.execute("SELECT * FROM users WHERE id = :id", id=session["user_id"])
+
+            # Insert new sell transaction in table
+            db.execute("""INSERT INTO transactions (user_id, amount, price, symbol)
+                        VALUES (:id, :amount, :price, :symbol)""", id=session["user_id"], amount=-shares, price=unit_price, symbol=symbol)
+            transaction_id = db.execute("SELECT last_insert_rowid()")[0]['last_insert_rowid()']
+
+            # Update user's cash
+            cash, transaction_sum = row[0]['cash'], (shares * unit_price)
+            cash += transaction_sum
+
+            # Update the row that refers
+            # to his shares of this stock
+            db.execute("""UPDATE portfolios SET shares = shares - :shares, last_trans_id = :transaction_id
+                            WHERE symbol = :symbol AND user_id = :id """, id=session["user_id"], symbol=symbol, shares=shares, transaction_id=transaction_id)
+
+            # Exclude row from user portifolio if all the shares were sold
+            if  shares == owned_shares[0]['shares']:
+                db.execute("""DELETE FROM portfolios WHERE last_trans_id = :transaction_id""", transaction_id=transaction_id)
+
+            # Subtract transaction value from user funds
+            db.execute("UPDATE users SET cash = :cash WHERE id = :id", cash=cash, id=session["user_id"])
+
+            return render_template("sell.html", status="success", message=f"Transaction succeded, you sold {shares} shares of {name}", symbols=owned_stocks)
+        else:
+            return render_template("sell.html", status="danger", message=f"Transaction failed, insuficient shares for selling {shares} shares of {name}", symbols=owned_stocks)
+    else:        
+        return render_template("sell.html", symbols=owned_stocks)
 
 
 def errorhandler(e):
